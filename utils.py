@@ -274,7 +274,7 @@ def compute_state(attrs, points):
     points = torch.Tensor(points)
     attrs = attrs.unsqueeze(1)
     points = points.unsqueeze(0)
-    dists_all = torch.sum((points - attrs[...,1:])**2, dim=-1)
+    dists_all = torch.sum((points - attrs)**2, dim=-1)
     dist_min, points_label = torch.min(dists_all, dim=-2)
     return points_label.cpu().numpy().astype(np.int32)
 
@@ -290,3 +290,11 @@ def random_colors(N, bright=True, shuffle=False):
     if shuffle:
         random.shuffle(colors)
     return colors
+
+def pc_normalize(pc):
+    centroid = (np.amax(pc, axis=-2, keepdims=True) + np.amin(pc, axis=-2, keepdims=True))/2
+    pc = pc - centroid
+    l = np.sqrt(np.sum(pc**2, axis=-1, keepdims=True))
+    m = np.amax(l, axis=-2,keepdims=True)
+    pc = pc / m
+    return pc, m, centroid

@@ -56,15 +56,15 @@ for i, t in enumerate(grasp_poses[np.where(successes==1)[0]]):
 prim_colors = random_colors(256)
 
 # Load semantic primitives
-prim_anno = np.load('to_use_grasp_transfer/template/primitive.npz')['primitives'] # [M, 4]
+prim_anno = np.load('to_use_grasp_transfer/template/prim_seg.npz')['primitives'] # [M, 4]
 contact_points = np.stack(contact_points, axis=0) # [N, 3]
-points_label = compute_state(prim_anno[:,1:], contact_points) # [N, ]
+points_label = compute_state(prim_anno, contact_points) # [N, ]
 prim_graspbooks = {k: [] for k in range(len(prim_anno))}
 for p, k, g in zip(contact_points, points_label, grasps):
     prim_graspbooks[k].append(g)
 
 for k, v in prim_graspbooks.items():
-    if len(v) > 10:
+    if len(v) > 30:
         print(k)
 
 
@@ -72,52 +72,54 @@ for k, v in prim_graspbooks.items():
 obj_anno = trimesh_to_o3d(obj_anno.apply_transform(vis_rotation)).paint_uniform_color([0, 0.8, 0])
 scene_o3d = [obj_anno]
 # query_prim_ids = [17, 136, 183, ]
-query_prim_ids = [17]
+query_prim_ids = [13, 85, 200]
 
 for query_prim_id in query_prim_ids: 
-    prim_loc = prim_anno[query_prim_id, 1:] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
+    prim_loc = prim_anno[query_prim_id] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
     prim_o3d = o3d.geometry.TriangleMesh.create_sphere()
     prim_o3d.compute_vertex_normals()
     prim_o3d.scale(0.03, [0,0,0])
     prim_o3d.translate(prim_loc)
     prim_o3d.paint_uniform_color(prim_colors[query_prim_id])
     scene_o3d.append(prim_o3d)
-    for g in prim_graspbooks[query_prim_id]:
-        scene_o3d.append(trimesh_to_o3d(g).paint_uniform_color(prim_colors[query_prim_id]))
+    for gi, g in enumerate(prim_graspbooks[query_prim_id]):
+        if gi % 5 == 0:
+            scene_o3d.append(trimesh_to_o3d(g).paint_uniform_color(prim_colors[query_prim_id]))
 
 
-# # Transfer grasping w/ local translation
-# shape_ids = ['fad118b32085f3f2c2c72e575af174cd', '3c0467f96e26b8c6a93445a1757adf6', ] \
-#             +['8570d9a8d24cb0acbebd3c0c0c70fb03', 'b88bcf33f25c6cb15b4f129f868dedb']
+shape_ids = ['0', '1', '2']
+for i, shape_id in enumerate(shape_ids):
+    prim_trans =  np.load('to_use_grasp_transfer/my_mugs_prim/{}.npz'.format(shape_id))['primitives']
+    mesh = trimesh.load('to_use_grasp_transfer/pred/mesh_{}_rescale.obj'.format(shape_id))
+    vertices, norm_scale, norm_shift = pc_normalize(np.array(mesh.vertices))
+    obj_trans = trimesh_to_o3d(mesh.apply_transform(vis_rotation))
+    vis_dist = (i+1)*2
+    obj_trans.translate([0, 0, vis_dist])
+    scene_o3d.append(obj_trans)
+    for query_prim_id in query_prim_ids:
+        if prim_trans[query_prim_id].sum() > 1000: continue
+        prim_loc_trans = prim_trans[query_prim_id] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
+        prim_loc_anno = prim_anno[query_prim_id] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
+        prim_offset = prim_loc_trans - prim_loc_anno
+
+        prim_o3d = o3d.geometry.TriangleMesh.create_sphere()
+        prim_o3d.compute_vertex_normals()
+        prim_o3d.scale(0.03, [0,0,0])
+        prim_o3d.translate(prim_loc_trans)
+        prim_o3d.translate([0, 0, vis_dist])
+        prim_o3d.paint_uniform_color(prim_colors[query_prim_id])
+        scene_o3d.append(prim_o3d)
+        for gi, g in enumerate(prim_graspbooks[query_prim_id]):
+            if gi % 5 == 0:
+                gripper_o3d = trimesh_to_o3d(g).paint_uniform_color(prim_colors[query_prim_id])
+                gripper_o3d.translate(prim_offset)
+                gripper_o3d.translate([0, 0, vis_dist])
+                scene_o3d.append(gripper_o3d)
+
+# shape_ids = ['2']
 # for i, shape_id in enumerate(shape_ids):
-#     prim_trans =  np.load('to_use_grasp_transfer/trans/primitive_{}.npz'.format(shape_id))['primitives']
-#     obj_trans = trimesh_to_o3d(trimesh.load('to_use_grasp_transfer/trans/shape_{}.obj'.format(shape_id)).apply_transform(vis_rotation))
-#     vis_dist = (i+1)*2
-#     obj_trans.translate([0, 0, vis_dist])
-#     scene_o3d.append(obj_trans)
-#     for query_prim_id in query_prim_ids:
-#         prim_loc_trans = prim_trans[query_prim_id, 1:] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
-#         prim_loc_anno = prim_anno[query_prim_id, 1:] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
-#         prim_offset = prim_loc_trans - prim_loc_anno
-
-#         prim_o3d = o3d.geometry.TriangleMesh.create_sphere()
-#         prim_o3d.compute_vertex_normals()
-#         prim_o3d.scale(0.03, [0,0,0])
-#         prim_o3d.translate(prim_loc_trans)
-#         prim_o3d.translate([0, 0, vis_dist])
-#         prim_o3d.paint_uniform_color(prim_colors[query_prim_id])
-#         scene_o3d.append(prim_o3d)
-#         for g in prim_graspbooks[query_prim_id]:
-#             gripper_o3d = trimesh_to_o3d(g).paint_uniform_color(prim_colors[query_prim_id])
-#             gripper_o3d.translate(prim_offset)
-#             gripper_o3d.translate([0, 0, vis_dist])
-#             scene_o3d.append(gripper_o3d)
-
-# DEBUG
-# shape_ids = ['0', '1']
-# for i, shape_id in enumerate(shape_ids):
-#     prim_trans =  np.load('to_use_grasp_transfer/my_mugs_prim/{}.npz'.format(shape_id))['primitives']
-#     mesh = trimesh.load('to_use_grasp_transfer/pred/mesh_{}_rescale.obj'.format(shape_id))
+#     prim_trans =  np.load('to_use_grasp_transfer/train_mugs_prim/{}.npz'.format(shape_id))['primitives']
+#     mesh = trimesh.load('to_use_grasp_transfer/train/mesh_{}.off'.format(shape_id))
 #     vertices, norm_scale, norm_shift = pc_normalize(np.array(mesh.vertices))
 #     # prim_trans = prim_trans*norm_scale+norm_shift
 #     # prim_trans[:,1] = -prim_trans[:,1]
@@ -128,7 +130,7 @@ for query_prim_id in query_prim_ids:
 #     for query_prim_id in query_prim_ids:
 #         prim_loc_trans = prim_trans[query_prim_id] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
 #         print(prim_loc_trans)
-#         prim_loc_anno = prim_anno[query_prim_id, 1:] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
+#         prim_loc_anno = prim_anno[query_prim_id] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
 #         prim_offset = prim_loc_trans - prim_loc_anno
 
 #         prim_o3d = o3d.geometry.TriangleMesh.create_sphere()
@@ -143,36 +145,6 @@ for query_prim_id in query_prim_ids:
 #             gripper_o3d.translate(prim_offset)
 #             gripper_o3d.translate([0, 0, vis_dist])
 #             scene_o3d.append(gripper_o3d)
-
-shape_ids = ['2']
-for i, shape_id in enumerate(shape_ids):
-    prim_trans =  np.load('to_use_grasp_transfer/train_mugs_prim/{}.npz'.format(shape_id))['primitives']
-    mesh = trimesh.load('to_use_grasp_transfer/train/mesh_{}.off'.format(shape_id))
-    vertices, norm_scale, norm_shift = pc_normalize(np.array(mesh.vertices))
-    # prim_trans = prim_trans*norm_scale+norm_shift
-    # prim_trans[:,1] = -prim_trans[:,1]
-    obj_trans = trimesh_to_o3d(mesh.apply_transform(vis_rotation))
-    vis_dist = (i+1)*2
-    obj_trans.translate([0, 0, vis_dist])
-    scene_o3d.append(obj_trans)
-    for query_prim_id in query_prim_ids:
-        prim_loc_trans = prim_trans[query_prim_id] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
-        print(prim_loc_trans)
-        prim_loc_anno = prim_anno[query_prim_id, 1:] @ rotation_matrix(np.pi/2, [0, 1, 0])[:3, :3].T
-        prim_offset = prim_loc_trans - prim_loc_anno
-
-        prim_o3d = o3d.geometry.TriangleMesh.create_sphere()
-        prim_o3d.compute_vertex_normals()
-        prim_o3d.scale(0.03, [0,0,0])
-        prim_o3d.translate(prim_loc_trans)
-        prim_o3d.translate([0, 0, vis_dist])
-        prim_o3d.paint_uniform_color(prim_colors[query_prim_id])
-        scene_o3d.append(prim_o3d)
-        for g in prim_graspbooks[query_prim_id]:
-            gripper_o3d = trimesh_to_o3d(g).paint_uniform_color(prim_colors[query_prim_id])
-            gripper_o3d.translate(prim_offset)
-            gripper_o3d.translate([0, 0, vis_dist])
-            scene_o3d.append(gripper_o3d)
 
 o3d.visualization.draw(scene_o3d)
 
