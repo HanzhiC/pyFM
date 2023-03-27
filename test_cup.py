@@ -52,10 +52,10 @@ def vis_plane_o3d(plane_points, plane_normals ):
 
 mesh_anno = trimesh.load('to_use_grasp_transfer/pred/mesh_0.obj')
 vert2prim_anno = np.load('to_use_grasp_transfer/correspondence_0.npy')
-mesh_trans = trimesh.load('to_use_grasp_transfer/pred/mesh_2.obj')
-vert2prim_trans = np.load('to_use_grasp_transfer/correspondence_2.npy')
+mesh_trans = trimesh.load('to_use_grasp_transfer/pred/mesh_1.obj')
+vert2prim_trans = np.load('to_use_grasp_transfer/correspondence_1.npy')
 
-for q_id in range(250):
+for q_id in [50]:
     # anno
     sub_mesh_prim_anno = get_submesh(mesh_anno, vert2prim_anno, q_id)
     sub_mesh_prim_anno.visual.vertex_colors = np.array([255, 0, 0])[None].repeat(len(sub_mesh_prim_anno.vertices), axis=0)
@@ -81,8 +81,8 @@ for q_id in range(250):
     coord = mesh_anno_o3d.create_coordinate_frame()
     # mesh_anno_o3d.transform(T_anno_trans)
     # plane_anno_o3d = vis_plane_o3d(plane_points_anno, plane_normals_anno).transform(T_anno_trans)
-    plane_anno_o3d = vis_plane_o3d(plane_points_anno, plane_normals_anno).rotate(R_anno_trans).translate(t_anno_trans)
-    mesh_anno_o3d = mesh_anno_o3d.rotate(R_anno_trans).translate(t_anno_trans)
+    plane_anno_o3d = vis_plane_o3d(plane_points_anno, plane_normals_anno).translate(t_anno_trans).rotate(R_anno_trans)
+    mesh_anno_o3d = mesh_anno_o3d.translate(t_anno_trans).rotate(R_anno_trans)
     plane_trans_o3d = vis_plane_o3d(plane_points_trans, plane_normals_trans )
 
     mesh_anno_o3d.paint_uniform_color([0,1,0])
