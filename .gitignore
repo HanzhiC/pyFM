@@ -1,2 +1,4 @@
 */__pycache__/*
 .ipynb_checkpoints/*
+/datasets/*
+to_use_grasp_transfer/*
